@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using PlatformService.Data;
 using PlatformService.DTOs;
 using PlatformService.Model;
+using PlatformService.SyncDataService.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,11 +18,12 @@ namespace PlatformService.Controllers
     {
         private readonly IPlatformRepository _repository;
         private readonly IMapper _mapper;
-        public PlatformController(IPlatformRepository repository, IMapper mapper)
+        private readonly ICommandDataClient _commandDataClient;
+        public PlatformController(IPlatformRepository repository, IMapper mapper, ICommandDataClient commandDataClient)
         {
             _repository = repository;
             _mapper = mapper;
-
+            _commandDataClient = commandDataClient;
         }
 
         [HttpGet]
@@ -43,14 +45,26 @@ namespace PlatformService.Controllers
         }
 
         [HttpPost]
-        public ActionResult<PlatformReadDto> CreatePlatform(PlatformCreateDto platformCreateDto)
+        public async Task<ActionResult<PlatformReadDto>> CreatePlatform(PlatformCreateDto platformCreateDto)
         {
             var model = _mapper.Map<Platform>(platformCreateDto);
             _repository.CreatePlatform(model);
             _repository.SaveChanges();
 
             var platformReadDto = _mapper.Map<PlatformReadDto>(model);
-            return CreatedAtRoute(nameof(GetPlatformById), new { Id = platformReadDto.Id }, platformReadDto);
+
+            try
+            {
+                await _commandDataClient.SendPlatformToCommand(platformReadDto);
+            }
+            catch (Exception ex)
+            {
+
+                Console.WriteLine($"--> Could not send synchronous call{ex.Message}");
+            }
+
+
+            return CreatedAtRoute(nameof(GetPlatformById), new { id = platformReadDto.Id }, platformReadDto);
         }
     }
 }
