@@ -15,3 +15,5 @@ spec:
       containers:
         - name: platformservice
           image: daazee/platformservice:latest
+
+---
